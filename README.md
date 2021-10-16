@@ -1,9 +1,11 @@
 
 # arowana
 
+
 ![](https://gitee.com/arcticfox1919/ImageHosting/raw/master/img/2021-10-17-002.png)
 
-A lightweight HTTP server framework for Dart.
+
+A lightweight HTTP server framework for Dart.It is based on the [shelf](https://github.com/dart-lang/shelf) library for handling HTTP requests and implements a high-performance routing with reference to Golang's Gin framework.
 
 
 ## Usage
