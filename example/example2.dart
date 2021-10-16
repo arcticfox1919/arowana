@@ -14,8 +14,7 @@ class MyAChannel extends DefaultChannel{
 
   @override
   void entryPoint() {
-    var r = group('/v1');
-    r.get('/hello', (r){
+    get('/hello', (r){
       return Response.ok('hello,arowana!');
     });
   }
