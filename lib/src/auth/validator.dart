@@ -3,6 +3,12 @@ import 'dart:async';
 
 import 'authorizer.dart';
 
+class TokenExpiredException implements Exception{
+  String message;
+
+  TokenExpiredException(this.message);
+}
+
 abstract class AuthValidator {
   /// Returns an [Authorization] if [authorizationData] is valid.
   ///

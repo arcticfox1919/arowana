@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
-import 'package:arowana/src/utilities/request_and_response.dart';
+import 'package:arowana/src/http/request_and_response.dart';
 
 import 'validator.dart';
 
@@ -50,20 +50,22 @@ class Auth{
 
   Handler call(Handler innerHandler){
 
-    return (r){
+    return (r)async{
       var authData = r.headers[HttpHeaders.authorizationHeader];
 
       if (authData == null) {
-        return ResponseX.unauthorized();
+        return ResponseX.unauthorized('Unauthorized');
       }
 
       try {
         final value = parser.parse(authData);
-        var authorization = validator.validate(parser, value);
+        var authorization = await validator.validate(parser, value);
         if (authorization == null) {
-          return ResponseX.unauthorized();
+          return ResponseX.unauthorized('Unauthorized');
         }
         return innerHandler(r);
+      } on TokenExpiredException catch(e){
+        return ResponseX.unauthorized(e.message);
       } on AuthorizationParserException catch (e) {
         return _responseFromParseException(e);
       }
@@ -73,11 +75,11 @@ class Auth{
   Response _responseFromParseException(AuthorizationParserException e) {
     switch (e.reason) {
       case AuthorizationParserExceptionReason.malformed:
-        return ResponseX.badRequest('error: invalid_authorization_header');
+        return ResponseX.badRequest('Error: invalid_authorization_header');
       case AuthorizationParserExceptionReason.missing:
-        return ResponseX.unauthorized();
+        return ResponseX.unauthorized('Unauthorized');
       default:
-        return ResponseX.serverError();
+        return ResponseX.serverError('Internal Server Error');
     }
   }
 }
@@ -193,8 +195,44 @@ class Authorization {
   final AuthBasicCredentials? credentials;
 }
 
+class AuthToken {
+  /// The value to be passed as a Bearer Authorization header.
+  String accessToken;
+
+  /// The value to be passed for refreshing a token.
+  String? refreshToken;
+
+  /// The time this token was issued on.
+  DateTime issueDate;
+
+  /// The time when this token expires.
+  DateTime expirationDate;
+
+  AuthToken(this.accessToken, this.issueDate, this.expirationDate,
+      [this.refreshToken]);
+
+  /// Whether or not this token is expired by evaluated [expirationDate].
+  bool get isExpired {
+    return expirationDate.difference(DateTime.now().toUtc()).inSeconds <= 0;
+  }
+
+  /// Emits this instance as a [Map] according to the OAuth 2.0 specification.
+  Map<String, dynamic> asMap() {
+    final map = {
+      'access_token': accessToken,
+      'expires_in': expirationDate.difference(DateTime.now().toUtc()).inSeconds,
+    };
+
+    if (refreshToken != null) {
+      map['refresh_token'] = refreshToken!;
+    }
+
+    return map;
+  }
+}
+
 /// The reason either [AuthorizationBearerParser] or [AuthorizationBasicParser] failed.
-enum AuthorizationParserExceptionReason { missing, malformed }
+enum AuthorizationParserExceptionReason { missing, malformed}
 
 /// An exception indicating why Authorization parsing failed.
 class AuthorizationParserException implements Exception {

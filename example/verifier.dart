@@ -18,7 +18,7 @@ class AuthVerifier extends AuthValidator{
         "Invalid 'parser' for 'AuthValidator.validate'. Use 'AuthorizationBearerHeader'.");
   }
 
-  Future<Authorization?> _verify(String accessToken) async {
+  FutureOr<Authorization?> _verify(String accessToken) async {
 
   }
 }
