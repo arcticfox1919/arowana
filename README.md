@@ -7,6 +7,7 @@
 
 A lightweight HTTP server framework for Dart.It is based on the [shelf](https://github.com/dart-lang/shelf) library for handling HTTP requests and implements a high-performance routing with reference to Golang's Gin framework.
 
+It can be used in Flutter and run to mobile platforms.
 
 ## Usage
 
@@ -90,6 +91,9 @@ void main() {
   app.start(numberOfInstances: 2,consoleLogging: true);
 }
 ```
+
+## Example
+It has a complete example of authentication, visit [here](https://github.com/arcticfox1919/auth-server).
 
 ## Features and bugs
 
