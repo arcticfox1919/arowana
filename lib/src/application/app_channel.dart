@@ -11,8 +11,6 @@ abstract class AppChannel{
   /// on other isolates.
   late ApplicationOptions appOptions;
 
-  final ApplicationMessageHub messageHub = ApplicationMessageHub();
-
   Future initialize(ApplicationOptions options) async{}
 
   Future prepare()async{}

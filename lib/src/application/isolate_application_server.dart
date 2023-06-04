@@ -6,7 +6,6 @@ import 'package:logging/logging.dart';
 
 import 'application.dart';
 import 'isolate_supervisor.dart';
-import 'options.dart';
 
 class ApplicationIsolateServer extends ApplicationServer {
   ApplicationIsolateServer(ApplicationOptions configuration,
@@ -45,7 +44,7 @@ class ApplicationIsolateServer extends ApplicationServer {
     try {
       supervisingApplicationPort.send(MessageHubMessage(event));
     } catch (e, st) {
-      hubSink.addError(e, st);
+      // hubSink.addError(e, st);
     }
   }
 
@@ -53,7 +52,7 @@ class ApplicationIsolateServer extends ApplicationServer {
     if (message == ApplicationIsolateSupervisor.messageKeyStop) {
       stop();
     } else if (message is MessageHubMessage) {
-      hubSink.add(message.payload);
+      // hubSink.add(message.payload);
     }
   }
 

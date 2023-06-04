@@ -5,7 +5,6 @@ import 'package:logging/logging.dart';
 import 'app_channel.dart';
 import 'application.dart';
 
-import 'options.dart';
 import 'package:shelf/shelf_io.dart' as shelf_io;
 
 /// Listens for HTTP requests and delivers them to its [ApplicationChannel] instance.
@@ -26,11 +25,6 @@ class ApplicationServer {
   late HttpServer server;
 
   AppChannel channel;
-
-  /// Target for sending messages to other [ApplicationChannel.messageHub]s.
-  ///
-  /// Events are added to this property by instances of [ApplicationMessageHub] and should not otherwise be used.
-  late EventSink<dynamic> hubSink;
 
   /// Whether or not this server requires an HTTPS listener.
   bool get requiresHTTPS => _requiresHTTPS;
@@ -83,8 +77,6 @@ class ApplicationServer {
     await server.close(force: true);
     logger.fine('ApplicationServer($identifier).close Closing channel');
 
-    // This is actually closed by channel.messageHub.close, but this shuts up the analyzer.
-    hubSink.close();
     logger.fine('ApplicationServer($identifier).close Closing complete');
   }
 
