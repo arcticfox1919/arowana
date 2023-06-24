@@ -2,9 +2,10 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:isolate';
 import 'package:logging/logging.dart';
-import 'app_channel.dart';
 import 'application_server.dart';
-import 'isolate_application_server.dart';
+import 'declaration.dart';
+import 'isolate_message.dart';
+import 'isolate_server.dart';
 import 'isolate_supervisor.dart';
 import 'options.dart';
 import 'service_registry.dart';
@@ -19,8 +20,7 @@ export 'service_registry.dart';
 /// It is unlikely that you need to use this class directly - the `arowana serve` command creates an application object
 /// on your behalf.
 class Application {
-
-  Application(this.channel);
+  Application(this.channelBuilder);
 
   /// A list of isolates that this application supervises.
   List<ApplicationIsolateSupervisor> supervisors = [];
@@ -28,9 +28,9 @@ class Application {
   /// The [ApplicationServer] listening for HTTP requests while under test.
   ///
   /// This property is only valid when an application is started via [startOnCurrentIsolate].
-  ApplicationServer? server;
+  ApplicationServer? appServer;
 
-  AppChannel channel;
+  AppChannelBuilder channelBuilder;
 
   /// The logger that this application will write messages to.
   ///
@@ -70,7 +70,7 @@ class Application {
   ///
   /// See also [startOnCurrentIsolate] for starting an application when running automated tests.
   Future start({int numberOfInstances = 1, bool consoleLogging = false}) async {
-    if (server != null || supervisors.isNotEmpty) {
+    if (appServer != null || supervisors.isNotEmpty) {
       throw StateError(
           "Application error. Cannot invoke 'start' on already running Aqueduct application.");
     }
@@ -84,12 +84,9 @@ class Application {
     }
 
     try {
-      channel.appOptions = options;
-      await channel.initialize(options);
-
       for (var i = 0; i < numberOfInstances; i++) {
         final supervisor = await _spawn(
-            this,channel, options, i + 1, logger, isolateStartupTimeout,
+            this, channelBuilder, options, i + 1, logger, isolateStartupTimeout,
             logToConsole: consoleLogging);
         supervisors.add(supervisor);
         await supervisor.resume();
@@ -108,7 +105,7 @@ class Application {
   /// An application started in this way will run on the same isolate this method is invoked on.
   /// Performance is limited when running the application with this method; prefer to use [start].
   Future startOnCurrentIsolate() async {
-    if (server != null || supervisors.isNotEmpty) {
+    if (appServer != null || supervisors.isNotEmpty) {
       throw StateError(
           "Application error. Cannot invoke 'test' on already running Aqueduct application.");
     }
@@ -116,11 +113,8 @@ class Application {
     options.address ??= InternetAddress.loopbackIPv4;
 
     try {
-      channel.appOptions = options;
-      await channel.initialize(options);
-      server = ApplicationServer(options, 1,channel);
-
-      await server!.start();
+      appServer = DefaultServer(options, channelBuilder);
+      await appServer!.start();
       _hasFinishedLaunching = true;
     } catch (e, st) {
       logger.severe('$e', this, st);
@@ -136,11 +130,13 @@ class Application {
   Future stop() async {
     _hasFinishedLaunching = false;
     await Future.wait(supervisors.map((s) => s.stop()));
-    await server?.server.close(force: true);
+    if(appServer != null){
+      await appServer!.server?.close(force: true);
+    }
 
     await ServiceRegistry.defaultInstance.close();
     _hasFinishedLaunching = false;
-    server = null;
+    appServer = null;
     supervisors = [];
 
     logger.clearListeners();
@@ -148,7 +144,7 @@ class Application {
 
   Future<ApplicationIsolateSupervisor> _spawn(
       Application application,
-      AppChannel channel,
+      AppChannelBuilder channelBuilder,
       ApplicationOptions config,
       int identifier,
       Logger logger,
@@ -156,12 +152,12 @@ class Application {
       {bool logToConsole = false}) async {
     final receivePort = ReceivePort();
 
-    final initialMessage = ApplicationInitialServerMessage(
-        config, identifier, receivePort.sendPort,channel,
+    final initialMessage = InitialServerEvent(
+        config, identifier, receivePort.sendPort, channelBuilder,
         logToConsole: logToConsole);
 
-    final isolate = await Isolate.spawn(isolateServerEntryPoint, initialMessage,
-        paused: true,debugName: 'Worker id:$identifier');
+    final isolate = await Isolate.spawn(isolateEntryPoint, initialMessage,
+        paused: true, debugName: 'Worker id:$identifier');
 
     return ApplicationIsolateSupervisor(
         application, isolate, receivePort, identifier, logger,
@@ -169,10 +165,10 @@ class Application {
   }
 }
 
-void isolateServerEntryPoint(ApplicationInitialServerMessage params) {
-  final server = ApplicationIsolateServer(params.configuration,
-      params.identifier, params.parentMessagePort, params.channel,
-      logToConsole: params.logToConsole);
+void isolateEntryPoint(InitialServerEvent msg) {
+  final server = IsolateServer(msg.payload.$1, msg.payload.$2,
+      msg.payload.$3, msg.payload.$4,
+      logToConsole: msg.payload.logToConsole);
   server.start(shareHttpServer: true);
 }
 

@@ -1,12 +1,13 @@
 import 'dart:async';
 import 'dart:isolate';
 
+import 'package:arowana/src/application/isolate_message.dart';
 import 'package:logging/logging.dart';
 
 import 'application.dart';
-import 'isolate_application_server.dart';
+import 'isolate_server.dart';
 
-/// Represents the supervision of a [ApplicationIsolateServer].
+/// Represents the supervision of a [IsolateServer].
 ///
 /// You should not use this class directly.
 class ApplicationIsolateSupervisor {
@@ -33,16 +34,13 @@ class ApplicationIsolateSupervisor {
   /// A reference to the [Logger] used by the [supervisingApplication].
   Logger logger;
 
-  final List<MessageHubMessage> _pendingMessageQueue = [];
+  final List<BroadcastEvent> _pendingMessageQueue = [];
 
   bool get _isLaunching => _launchCompleter != null;
 
-  late SendPort _serverSendPort;
-  late Completer ?_launchCompleter;
-  late Completer _stopCompleter;
-
-  static const String messageKeyStop = '_MessageStop';
-  static const String messageKeyListening = '_MessageListening';
+  SendPort? _serverSendPort;
+  Completer ?_launchCompleter;
+  Completer? _stopCompleter;
 
   /// Resumes the [Isolate] being supervised.
   Future resume() {
@@ -74,10 +72,10 @@ class ApplicationIsolateSupervisor {
     _stopCompleter = Completer();
     logger.fine(
         'ApplicationIsolateSupervisor($identifier).stop sending stop to supervised isolate');
-    _serverSendPort.send(messageKeyStop);
+    _serverSendPort?.send(ControlEvent(CtrlType.stop));
 
     try {
-      await _stopCompleter.future.timeout(const Duration(seconds: 5));
+      await _stopCompleter!.future.timeout(const Duration(seconds: 5));
     } on TimeoutException {
       logger.severe(
           'Isolate ($identifier) not responding to stop message, terminating.');
@@ -88,44 +86,50 @@ class ApplicationIsolateSupervisor {
   }
 
   void listener(dynamic message) {
-    if (message is SendPort) {
-      _serverSendPort = message;
-    } else if (message == messageKeyListening) {
-      _launchCompleter?.complete();
-      _launchCompleter = null;
-      logger.fine(
-          'ApplicationIsolateSupervisor($identifier) isolate listening acknowledged');
-    } else if (message == messageKeyStop) {
-      logger.fine(
-          'ApplicationIsolateSupervisor($identifier) stop message acknowledged');
-      receivePort.close();
-
-      _stopCompleter.complete();
-    } else if (message is List) {
-      logger.fine(
-          'ApplicationIsolateSupervisor($identifier) received isolate error ${message.first}');
-      final stacktrace = StackTrace.fromString(message.last as String);
-      _handleIsolateException(message.first, stacktrace);
-    } else if (message is MessageHubMessage) {
-      if (!supervisingApplication.isRunning) {
-        _pendingMessageQueue.add(message);
-      } else {
-        _sendMessageToOtherSupervisors(message);
-      }
+    switch (message) {
+      case InitialIsolateSendPortEvent m:
+        _serverSendPort = m.payload;
+        break;
+      case BroadcastEvent m:
+        if (!supervisingApplication.isRunning) {
+          _pendingMessageQueue.add(m);
+        } else {
+          _sendToOtherSupervisors(m);
+        }
+        break;
+      case ControlEvent m:
+        if (m.payload == CtrlType.started) {
+          _launchCompleter?.complete();
+          _launchCompleter = null;
+          logger.fine(
+              'ApplicationIsolateSupervisor($identifier) isolate listening acknowledged');
+        } else if (m.payload == CtrlType.stopped) {
+          logger.fine(
+              'ApplicationIsolateSupervisor($identifier) stop message acknowledged');
+          receivePort.close();
+          _stopCompleter?.complete();
+        }
+        break;
+      case ExceptionEvent m:
+        logger.fine(
+            'ApplicationIsolateSupervisor($identifier) received isolate error ${m.payload}');
+        final stacktrace = StackTrace.fromString(m.payload);
+        _handleIsolateException(m.payload, stacktrace);
+        break;
     }
   }
 
   void sendPendingMessages() {
-    final list = List<MessageHubMessage>.from(_pendingMessageQueue);
+    final list = List<BroadcastEvent>.from(_pendingMessageQueue);
     _pendingMessageQueue.clear();
-    list.forEach(_sendMessageToOtherSupervisors);
+    list.forEach(_sendToOtherSupervisors);
   }
 
-  void _sendMessageToOtherSupervisors(MessageHubMessage message) {
+  void _sendToOtherSupervisors(BroadcastEvent message) {
     supervisingApplication.supervisors
         .where((sup) => sup != this)
         .forEach((supervisor) {
-      supervisor._serverSendPort.send(message);
+      supervisor._serverSendPort?.send(message);
     });
   }
 
