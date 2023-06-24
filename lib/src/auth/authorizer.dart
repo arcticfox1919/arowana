@@ -3,8 +3,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:shelf/shelf.dart';
-import 'package:arowana/src/http/request_and_response.dart';
-
 import 'validator.dart';
 
 
@@ -54,18 +52,18 @@ class Auth{
       var authData = r.headers[HttpHeaders.authorizationHeader];
 
       if (authData == null) {
-        return ResponseX.unauthorized('Unauthorized');
+        return Response.unauthorized('Unauthorized');
       }
 
       try {
         final value = parser.parse(authData);
         var authorization = await validator.validate(parser, value);
         if (authorization == null) {
-          return ResponseX.unauthorized('Unauthorized');
+          return Response.unauthorized('Unauthorized');
         }
         return innerHandler(r);
       } on TokenExpiredException catch(e){
-        return ResponseX.unauthorized(e.message);
+        return Response.unauthorized(e.message);
       } on AuthorizationParserException catch (e) {
         return _responseFromParseException(e);
       }
@@ -75,11 +73,11 @@ class Auth{
   Response _responseFromParseException(AuthorizationParserException e) {
     switch (e.reason) {
       case AuthorizationParserExceptionReason.malformed:
-        return ResponseX.badRequest('Error: invalid_authorization_header');
+        return Response.badRequest(body: 'Error: invalid_authorization_header');
       case AuthorizationParserExceptionReason.missing:
-        return ResponseX.unauthorized('Unauthorized');
+        return Response.unauthorized('Unauthorized');
       default:
-        return ResponseX.serverError('Internal Server Error');
+        return Response.internalServerError(body: 'Internal Server Error');
     }
   }
 }

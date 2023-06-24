@@ -1,30 +1,34 @@
 import 'dart:async';
 import 'dart:io';
 
+import 'package:arowana/arowana.dart';
+import 'package:arowana/src/application/isolate_message.dart';
 import 'package:logging/logging.dart';
-import 'app_channel.dart';
-import 'application.dart';
 
 import 'package:shelf/shelf_io.dart' as shelf_io;
+
+import 'declaration.dart';
 
 /// Listens for HTTP requests and delivers them to its [ApplicationChannel] instance.
 ///
 /// An Aqueduct application creates instances of this type to pair an HTTP server and an
 /// instance of an [ApplicationChannel] subclass. Instances are created by [Application]
 /// and shouldn't be created otherwise.
-class ApplicationServer {
+abstract base class ApplicationServer {
   /// Creates a new server.
   ///
   /// You should not need to invoke this method directly.
-  ApplicationServer(this.options, this.identifier,this.channel);
+  ApplicationServer(this.options, this.identifier, this.channelBuilder);
+
+  AppChannel? channel;
 
   /// The configuration this instance used to start its [channel].
   ApplicationOptions options;
 
   /// The underlying [HttpServer].
-  late HttpServer server;
+  HttpServer? server;
 
-  AppChannel channel;
+  AppChannelBuilder channelBuilder;
 
   /// Whether or not this server requires an HTTPS listener.
   bool get requiresHTTPS => _requiresHTTPS;
@@ -42,19 +46,18 @@ class ApplicationServer {
   /// Starts this instance, allowing it to receive HTTP requests.
   ///
   /// Do not invoke this method directly.
-  Future start({bool shareHttpServer = false}) async {
+  Future<bool> start({bool shareHttpServer = false}) async {
     logger.fine('ApplicationServer($identifier).start entry');
-
-    await channel.prepare();
-
-    channel.entryPoint();
+    channel = channelBuilder();
+    await channel!.initialize(options);
+    await channel!.prepare();
+    channel!.entryPoint();
 
     logger.fine('ApplicationServer($identifier).start binding HTTP');
-
     _requiresHTTPS = securityContext != null;
 
-    await shelf_io.serve(channel, options.address, options.port,
-        securityContext: securityContext,shared: shareHttpServer);
+    server = await shelf_io.serve(channel!, options.address, options.port,
+        securityContext: securityContext, shared: shareHttpServer);
 
     logger.fine('ApplicationServer($identifier).start bound HTTP');
     return Future.value(true);
@@ -74,13 +77,19 @@ class ApplicationServer {
   /// Closes this HTTP server and channel.
   Future close() async {
     logger.fine('ApplicationServer($identifier).close Closing HTTP listener');
-    await server.close(force: true);
+    await channel?.dispose();
+    await server?.close(force: true);
     logger.fine('ApplicationServer($identifier).close Closing channel');
 
     logger.fine('ApplicationServer($identifier).close Closing complete');
   }
 
-  void sendApplicationEvent(dynamic event) {
+  void sendApplicationEvent(IsolateEvent event) {
     // By default, do nothing
   }
+}
+
+final class DefaultServer extends ApplicationServer {
+  DefaultServer(ApplicationOptions options, AppChannelBuilder channelBuilder)
+      : super(options, 0, channelBuilder);
 }

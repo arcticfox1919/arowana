@@ -3,7 +3,9 @@ import 'dart:isolate';
 
 import 'package:arowana/arowana.dart';
 
-class MyAChannel extends AppChannel {
+base class MyAChannel extends AppChannel {
+  MyAChannel(String a);
+
   Router app = Router();
 
   Middleware verification() => (innerHandler) {
@@ -12,7 +14,7 @@ class MyAChannel extends AppChannel {
               request.query['pass'] == '123') {
             return await innerHandler(request);
           } else {
-            return ResponseX.unauthorized('Authentication failed !!!');
+            return Response.unauthorized('Authentication failed !!!');
           }
         };
       };
@@ -21,7 +23,7 @@ class MyAChannel extends AppChannel {
   void entryPoint() {
     var r1 = app.group('/v1');
 
-    // var middleware = Pipeline().addMiddleware(verification()).middleware;
+// var middleware = Pipeline().addMiddleware(verification()).middleware;
     r1.use(verification());
     r1.get('/hello', (Request request) {
       return Response.ok('hello-world');
@@ -48,7 +50,9 @@ class MyAChannel extends AppChannel {
 }
 
 void main() {
-  var app = Application(MyAChannel());
-  app.options = ApplicationOptions()..address = '127.0.0.1';
-  app.start(numberOfInstances: 2,consoleLogging: true);
+  var app = Application(() => MyAChannel(''));
+  app.options = ApplicationOptions()
+    ..port = 49218
+    ..address = '127.0.0.1';
+  app.start(numberOfInstances: 2, consoleLogging: true);
 }

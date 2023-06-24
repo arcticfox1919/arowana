@@ -35,7 +35,7 @@ class MyAChannel extends DefaultChannel{
 
 
 void main() {
-  var app = Application(MyAChannel());
+  var app = Application(() => MyAChannel(''));
   app.start(numberOfInstances: 2,consoleLogging: true);
 }
 ```
@@ -86,11 +86,45 @@ class MyAChannel extends AppChannel {
 }
 
 void main() {
-  var app = Application(MyAChannel());
+  var app = Application(() => MyAChannel(''));
   app.options = ApplicationOptions()..address = '127.0.0.1';
   app.start(numberOfInstances: 2,consoleLogging: true);
 }
 ```
+
+> Upgrade to 0.1.0:
+> You can create websocket serving and static file serving
+
+```dart
+final class MyWebSocket extends WebSocketController{
+  MyWebSocket() : super(null,null,null);
+
+  @override
+  void onConnection(WebSocketChannel webSocket, String? protocol) {
+    webSocket.stream.listen((message) {
+      webSocket.sink.add('echo $message');
+    });
+  }
+}
+```
+
+register:
+```dart
+  @override
+  void entryPoint() {
+    get('/hello', (r) async {
+      return Response.ok('hello,arowana! form:${Isolate.current.debugName}');
+    });
+
+    get('/ws', MyWebSocket());
+    
+    // visit http://127.0.0.1:8888/example/example.dart
+    get('/example/*path', createStaticHandler('.'));
+  }
+```
+
+
+
 
 ## Example
 It has a complete example of authentication, visit [here](https://github.com/arcticfox1919/auth-server).

@@ -1,5 +1,6 @@
 
-
 import 'package:arowana/arowana.dart';
 
-abstract class DefaultChannel extends AppChannel with Router{}
+abstract base class DefaultChannel extends AppChannel with Router{
+
+}

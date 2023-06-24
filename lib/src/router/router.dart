@@ -19,7 +19,7 @@ final _removeBody = createMiddleware(responseHandler: (r) {
   return r.change(body: <int>[]);
 });
 
-class Router{
+mixin class Router{
 
   /// The [notFoundHandler] will be invoked for requests where no matching route
   /// was found. By default, a simple [Response.notFound] will be used instead.
@@ -198,13 +198,6 @@ class Router{
   /// // [Router.routeNotFound], which will cause matching to continue.
   /// // Hence, the catch-all route below will be matched, causing a custom 404
   /// // response with message 'nothing found'.
-  ///
-  /// // In the pattern below `<anything|.*>` is on the form `<name|regex>`,
-  /// // thus, this simply creates a URL parameter called `anything` which
-  /// // matches anything.
-  /// app.all('/<anything|.*>', (Request request) {
-  ///   return Response.notFound('nothing found');
-  /// });
   /// ```
   static final Response routeNotFound = _RouteNotFoundResponse();
 }
