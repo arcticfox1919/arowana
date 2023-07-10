@@ -35,7 +35,7 @@ class MyAChannel extends DefaultChannel{
 
 
 void main() {
-  var app = Application(() => MyAChannel(''));
+  var app = Application(() => MyAChannel());
   app.start(numberOfInstances: 2,consoleLogging: true);
 }
 ```
@@ -86,7 +86,7 @@ class MyAChannel extends AppChannel {
 }
 
 void main() {
-  var app = Application(() => MyAChannel(''));
+  var app = Application(() => MyAChannel());
   app.options = ApplicationOptions()..address = '127.0.0.1';
   app.start(numberOfInstances: 2,consoleLogging: true);
 }
